@@ -20,8 +20,9 @@ constexpr uint8_t OUTPUT_PINS[] = {
     PB7,
     PB6,
     PB5,
-    PB4,
-    PB3,
+    //PB4-PA15 do not have sink capability, PA12-11 are USB
+    PA10,
+    PA9,
     PC13
 };
 uint8_t input_state[sizeof(INPUT_PINS)] = {0};
