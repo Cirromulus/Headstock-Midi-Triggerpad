@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <USBComposite.h>
 
-static constexpr int8_t base_note = 60;
+#include <limits>   // Push it to the limits!
+
+static constexpr int8_t base_note = 60;   //C3 or C4, depending on
 
 constexpr bool invert_input = false;
 constexpr uint8_t INPUT_PINS[] = {
@@ -23,23 +25,33 @@ constexpr uint8_t OUTPUT_PINS[] = {
     //PB4-PA15 do not have sink capability, PA12-11 are USB
     PA10,
     PA9,
-    PC13
 };
 uint8_t input_state[sizeof(INPUT_PINS)] = {0};
 
-
 class myMidi : public USBMIDI {
- virtual void handleNoteOff(unsigned int channel, unsigned int note, unsigned int velocity) {
-     if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
-         digitalWrite(OUTPUT_PINS[note - base_note], 0 ^ invert_output);
+  void actuateNote(unsigned int channel, unsigned int note, bool on) {
+    int8_t offs = -1;
+    static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(offs)>::max());
+    switch (channel) {
+      case 1:
+       offs = note % sizeof(OUTPUT_PINS);
+       break;
+     default:
+       if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
+         offs = note - base_note;
+       }
      }
-     digitalWrite(PC13, 1); //debug
- }
- virtual void handleNoteOn(unsigned int channel, unsigned int note, unsigned int velocity) {
-     if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
-         digitalWrite(OUTPUT_PINS[note - base_note], 1 ^ invert_output);
+     if(offs >= 0) {
+       digitalWrite(OUTPUT_PINS[offs], on ^ invert_output);
      }
-     digitalWrite(PC13, 0); //debug
+     digitalWrite(PC13, on ^ true); //debug
+  };
+
+  virtual void handleNoteOff(unsigned int channel, unsigned int note, unsigned int velocity) {
+    actuateNote(channel, note, false);
+  }
+  virtual void handleNoteOn(unsigned int channel, unsigned int note, unsigned int velocity) {
+    actuateNote(channel, note, true);
   }
   virtual void handleControlChange(unsigned int channel, unsigned int controller, unsigned int value) {
     // TODO: Funny Patterns
@@ -51,6 +63,10 @@ myMidi midi;
 USBCompositeSerial CompositeSerial;
 
 void setup() {
+    // debug onboard PIN
+    pinMode(PC13, OUTPUT);
+    digitalWrite(PC13, 1);
+    
     for(const auto pin : OUTPUT_PINS) {
         pinMode(pin, OUTPUT);
         digitalWrite(pin, 0 ^ invert_output);
@@ -62,6 +78,8 @@ void setup() {
             pinMode(pin, INPUT_PULLDOWN);
     }
     USBComposite.setProductId(0x0031);
+    USBComposite.setProductString("Headstock_Trigger");
+    USBComposite.setManufacturerString("PascalPieper.de");
     midi.registerComponent();
     CompositeSerial.registerComponent();
     USBComposite.begin();
