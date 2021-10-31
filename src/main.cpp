@@ -34,8 +34,21 @@ class myMidi : public USBMIDI {
     static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(offs)>::max());
     switch (channel) {
       case 1:
-       offs = note % sizeof(OUTPUT_PINS);
-       break;
+        // "solo" modulo mode
+        offs = note % sizeof(OUTPUT_PINS);
+        break;
+      case 2:
+        // "memory" mode that keeps on lighting the last note
+        // Intended for showing current playing instrument slot
+        if(on) {
+          if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
+            for(const auto pin : OUTPUT_PINS) {
+              digitalWrite(pin, 0 ^ invert_output);
+            }
+            offs = note - base_note;
+          }
+        }
+        break;
      default:
        if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
          offs = note - base_note;
@@ -66,7 +79,7 @@ void setup() {
     // debug onboard PIN
     pinMode(PC13, OUTPUT);
     digitalWrite(PC13, 1);
-    
+
     for(const auto pin : OUTPUT_PINS) {
         pinMode(pin, OUTPUT);
         digitalWrite(pin, 0 ^ invert_output);
