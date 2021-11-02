@@ -6,14 +6,10 @@ static constexpr int8_t base_note = 60;   //C3 or C4, depending on implementatio
 static constexpr int8_t base_cc = 30;
 static constexpr int8_t midi_max = 127;
 
-enum InputChannelMapping : uint8_t {
+enum ChannelMapping : uint8_t {
     standard = 0,
     modulo,
-    hold
-};
-
-enum OutputChannelMapping : uint8_t {
-    note = 0,
+    hold,
     cc_value
 };
 
@@ -45,11 +41,11 @@ class myMidi : public USBMIDI {
     int8_t offs = -1;
     static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(offs)>::max());
     switch (channel) {
-      case InputChannelMapping::modulo:
+      case ChannelMapping::modulo:
         // "solo" modulo mode
         offs = note % sizeof(OUTPUT_PINS);
         break;
-      case InputChannelMapping::hold:
+      case ChannelMapping::hold:
         // "memory" mode that keeps on lighting the last note
         // Intended for showing current playing instrument slot
         if(on) {
@@ -61,7 +57,7 @@ class myMidi : public USBMIDI {
           }
         }
         break;
-      case InputChannelMapping::standard:
+      case ChannelMapping::standard:
       default:
         if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
           offs = note - base_note;
@@ -80,7 +76,19 @@ class myMidi : public USBMIDI {
     actuateNote(channel, note, true);
   }
   virtual void handleControlChange(unsigned int channel, unsigned int controller, unsigned int value) {
-    // TODO: Funny Patterns
+    switch(channel) {
+      case ChannelMapping::cc_value:
+      default:
+        if(controller == base_cc || true) { // reacting on any channel at every controller
+          // all pins off
+          for(const auto pin : OUTPUT_PINS) {
+            digitalWrite(pin, 0 ^ invert_output);
+          }
+          //except for the active one
+          value %= midi_max+1; // just to be safe!
+          digitalWrite(OUTPUT_PINS[(sizeof(INPUT_PINS)-1)*value/midi_max], 1 ^ invert_output);
+        }
+    }
   }
 
 };
@@ -117,11 +125,11 @@ void loop() {
         uint8_t meas = digitalRead(INPUT_PINS[i]) ^ invert_input;
         if(input_state[i] != meas) {
             if(meas) {
-                midi.sendNoteOn(OutputChannelMapping::note, base_note + i, midi_max);
-                midi.sendControlChange(OutputChannelMapping::cc_value, base_cc, i*(sizeof(INPUT_PINS)-1)/midi_max);
+                midi.sendNoteOn(ChannelMapping::standard, base_note + i, midi_max);
+                midi.sendControlChange(ChannelMapping::cc_value, base_cc, i*(sizeof(INPUT_PINS)-1)/midi_max);
                 digitalWrite(PC13, 0); //debug
             } else {
-                midi.sendNoteOff(OutputChannelMapping::note, base_note + i, midi_max);
+                midi.sendNoteOff(ChannelMapping::standard, base_note + i, midi_max);
                 digitalWrite(PC13, 1); //debug
             }
             input_state[i] = meas;
