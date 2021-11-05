@@ -5,6 +5,8 @@
 static constexpr int8_t base_note = 60;   //C3 or C4, depending on implementation
 static constexpr int8_t base_cc = 0;      //Bank select
 static constexpr int8_t midi_max = 127;
+typedef unsigned long Time;
+static constexpr Time debounce_time_ms = 200; // time difference, may be smaller in type
 
 enum ChannelMapping : uint8_t {
     standard = 0,
@@ -34,7 +36,8 @@ constexpr uint8_t OUTPUT_PINS[] = {
     PA10,
     PA9,
 };
-uint8_t input_state[sizeof(INPUT_PINS)] = {0};
+uint8_t input_state[sizeof(INPUT_PINS)] = {0};      // reducing messages to "only changed"
+Time last_input_change[sizeof(INPUT_PINS)] = {0};   // input debounce
 
 uint8_t num_to_cc(uint8_t pin_number){
   static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(pin_number)>::max());
@@ -130,9 +133,10 @@ void setup() {
 
 void loop() {
     midi.poll();
+    Time now = millis();
     for(uint8_t i = 0; i < sizeof(INPUT_PINS); i++) {
         uint8_t meas = digitalRead(INPUT_PINS[i]) ^ invert_input;
-        if(input_state[i] != meas) {
+        if(input_state[i] != meas && now - last_input_change[i] > debounce_time_ms) {
             if(meas) {
                 midi.sendNoteOn(ChannelMapping::standard, base_note + i, midi_max);
                 midi.sendControlChange(ChannelMapping::cc_value, base_cc, num_to_cc(i));
@@ -142,6 +146,7 @@ void loop() {
                 digitalWrite(PC13, 1); //debug
             }
             input_state[i] = meas;
+            last_input_change[i] = now;
         }
     }
 }
