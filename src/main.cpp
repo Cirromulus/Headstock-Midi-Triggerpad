@@ -3,7 +3,7 @@
 #include <limits>   // Push it to the limits!
 
 static constexpr int8_t base_note = 60;   //C3 or C4, depending on implementation
-static constexpr int8_t base_cc = 30;
+static constexpr int8_t base_cc = 0;      //Bank select
 static constexpr int8_t midi_max = 127;
 
 enum ChannelMapping : uint8_t {
@@ -35,6 +35,15 @@ constexpr uint8_t OUTPUT_PINS[] = {
     PA9,
 };
 uint8_t input_state[sizeof(INPUT_PINS)] = {0};
+
+uint8_t num_to_cc(uint8_t pin_number){
+  static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(pin_number)>::max());
+  return (pin_number*midi_max)/(sizeof(INPUT_PINS)-1);
+}
+
+uint8_t cc_to_num(uint8_t cc_value){
+  return ((sizeof(INPUT_PINS)-1)*cc_value+(midi_max-1))/midi_max;
+}
 
 class myMidi : public USBMIDI {
   void actuateNote(unsigned int channel, unsigned int note, bool on) {
@@ -79,14 +88,14 @@ class myMidi : public USBMIDI {
     switch(channel) {
       case ChannelMapping::cc_value:
       default:
-        if(controller == base_cc || true) { // reacting on any channel at every controller
+        if(controller == base_cc) {
           // all pins off
           for(const auto pin : OUTPUT_PINS) {
             digitalWrite(pin, 0 ^ invert_output);
           }
           //except for the active one
           value %= midi_max+1; // just to be safe!
-          digitalWrite(OUTPUT_PINS[(sizeof(INPUT_PINS)-1)*value/midi_max], 1 ^ invert_output);
+          digitalWrite(OUTPUT_PINS[cc_to_num(value)], 1 ^ invert_output);
         }
     }
   }
@@ -126,7 +135,7 @@ void loop() {
         if(input_state[i] != meas) {
             if(meas) {
                 midi.sendNoteOn(ChannelMapping::standard, base_note + i, midi_max);
-                midi.sendControlChange(ChannelMapping::cc_value, base_cc, i*(sizeof(INPUT_PINS)-1)/midi_max);
+                midi.sendControlChange(ChannelMapping::cc_value, base_cc, num_to_cc(i));
                 digitalWrite(PC13, 0); //debug
             } else {
                 midi.sendNoteOff(ChannelMapping::standard, base_note + i, midi_max);
