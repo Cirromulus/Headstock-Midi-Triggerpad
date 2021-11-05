@@ -36,32 +36,41 @@ constexpr uint8_t OUTPUT_PINS[] = {
     PA10,
     PA9,
 };
-uint8_t input_state[sizeof(INPUT_PINS)] = {0};      // reducing messages to "only changed"
-Time last_input_change[sizeof(INPUT_PINS)] = {0};   // input debounce
+typedef uint8_t PinOffs;
+static_assert(sizeof(INPUT_PINS) < std::numeric_limits<PinOffs>::max());
+static constexpr PinOffs num_input_pins = sizeof(INPUT_PINS);
+static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<PinOffs>::max());
+static constexpr PinOffs num_output_pins = sizeof(OUTPUT_PINS);
 
-uint8_t num_to_cc(uint8_t pin_number){
-  static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(pin_number)>::max());
-  return (pin_number*midi_max)/(sizeof(INPUT_PINS)-1);
-}
 
-uint8_t cc_to_num(uint8_t cc_value){
-  return ((sizeof(INPUT_PINS)-1)*cc_value+(midi_max-1))/midi_max;
+uint8_t input_state[num_input_pins] = {0};      // reducing messages to "only changed"
+Time last_input_change[num_input_pins] = {0};   // input debounce
+
+uint8_t num_to_cc(PinOffs pin_number){
+  return (pin_number*midi_max)/(num_input_pins-1);
 }
+PinOffs cc_to_num(uint8_t cc_value){
+  return ((num_output_pins-1)*cc_value+(midi_max-1))/midi_max;
+}
+static_assert(num_input_pins == num_output_pins,
+  "Warning: if number of input and output pins differ, "
+  "midi CCs are not mapped correctly"
+);
 
 class myMidi : public USBMIDI {
   void actuateNote(unsigned int channel, unsigned int note, bool on) {
     int8_t offs = -1;
-    static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<typeof(offs)>::max());
+    static_assert(num_output_pins < std::numeric_limits<typeof(offs)>::max());
     switch (channel) {
       case ChannelMapping::modulo:
         // "solo" modulo mode
-        offs = note % sizeof(OUTPUT_PINS);
+        offs = note % num_output_pins;
         break;
       case ChannelMapping::hold:
         // "memory" mode that keeps on lighting the last note
         // Intended for showing current playing instrument slot
         if(on) {
-          if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
+          if(note >= base_note && (note - base_note) < num_output_pins) {
             for(const auto pin : OUTPUT_PINS) {
               digitalWrite(pin, 0 ^ invert_output);
             }
@@ -71,7 +80,7 @@ class myMidi : public USBMIDI {
         break;
       case ChannelMapping::standard:
       default:
-        if(note >= base_note && (note - base_note) < sizeof(OUTPUT_PINS)) {
+        if(note >= base_note && (note - base_note) < num_output_pins) {
           offs = note - base_note;
         }
       }
@@ -134,7 +143,7 @@ void setup() {
 void loop() {
     midi.poll();
     Time now = millis();
-    for(uint8_t i = 0; i < sizeof(INPUT_PINS); i++) {
+    for(uint8_t i = 0; i < num_input_pins; i++) {
         uint8_t meas = digitalRead(INPUT_PINS[i]) ^ invert_input;
         if(input_state[i] != meas && now - last_input_change[i] > debounce_time_ms) {
             if(meas) {

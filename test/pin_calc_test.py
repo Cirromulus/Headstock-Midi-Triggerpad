@@ -7,7 +7,7 @@ def cc_to_num(value):
 def num_to_cc(i):
     return int((i*midi_max)/(num_pins-1))
 
-pins = range(6)
+pins = range(num_pins)
 
 ccs = list(map(lambda x: num_to_cc(x), pins))
 
