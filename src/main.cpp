@@ -50,7 +50,9 @@ uint8_t num_to_cc(PinOffs pin_number){
   return (pin_number*midi_max)/(num_input_pins-1);
 }
 PinOffs cc_to_num(uint8_t cc_value){
-  return ((num_output_pins-1)*cc_value+(midi_max-1))/midi_max;
+  return ((num_output_pins-1)*cc_value+((midi_max/(num_input_pins-1))*2))/midi_max;
+  // this reacts at "start" of range, sometimes not good with certain DAWs
+  //return ((num_output_pins-1)*cc_value+(midi_max-1))/midi_max;
 }
 static_assert(num_input_pins == num_output_pins,
   "Warning: if number of input and output pins differ, "
