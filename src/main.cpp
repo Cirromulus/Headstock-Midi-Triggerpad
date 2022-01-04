@@ -2,11 +2,13 @@
 #include <USBComposite.h>
 #include <limits>   // Push it to the limits!
 
+// base configuration
 static constexpr int8_t base_note = 60;   //C3 or C4, depending on implementation
 static constexpr int8_t base_cc = 0;      //Bank select
 static constexpr int8_t midi_max = 127;
 typedef unsigned long Time;
 static constexpr Time debounce_time_ms = 200; // time difference, may be smaller in type
+static constexpr bool midi_cc_has_priority = true;
 
 enum ChannelMapping : uint8_t {
     standard = 0,
@@ -37,14 +39,17 @@ constexpr uint8_t OUTPUT_PINS[] = {
     PA9,
 };
 typedef uint8_t PinOffs;
+
+// basic sanity checks
 static_assert(sizeof(INPUT_PINS) < std::numeric_limits<PinOffs>::max());
 static constexpr PinOffs num_input_pins = sizeof(INPUT_PINS);
 static_assert(sizeof(OUTPUT_PINS) < std::numeric_limits<PinOffs>::max());
 static constexpr PinOffs num_output_pins = sizeof(OUTPUT_PINS);
 
-
+// global variables
 uint8_t input_state[num_input_pins] = {0};      // reducing messages to "only changed"
 Time last_input_change[num_input_pins] = {0};   // input debounce
+uint8_t last_mici_cc_value = 0;
 
 uint8_t num_to_cc(PinOffs pin_number){
   return (pin_number*midi_max)/(num_input_pins-1);
@@ -84,7 +89,12 @@ class myMidi : public USBMIDI {
           offs = note - base_note;
         }
       }
-      if(offs >= 0) {
+      if(offs >= 0 && (!midi_cc_has_priority ||
+                        (midi_cc_has_priority &&
+                          (last_mici_cc_value == 0 || // this one uses the fact that Ableton sends back the region's centered cc value, not the original one
+                          (last_mici_cc_value > 0 && offs != cc_to_num(last_mici_cc_value)))
+                      ) ) )
+      {
         digitalWrite(OUTPUT_PINS[offs], on ^ invert_output);
       }
       digitalWrite(PC13, on ^ true); //debug
@@ -108,6 +118,7 @@ class myMidi : public USBMIDI {
           //except for the active one
           value %= midi_max+1; // just to be safe!
           digitalWrite(OUTPUT_PINS[cc_to_num(value)], 1 ^ invert_output);
+          last_mici_cc_value = value;
         }
     }
   }
