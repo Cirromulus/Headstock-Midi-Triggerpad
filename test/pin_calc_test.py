@@ -12,6 +12,9 @@ def mid_cc_to_num(cc_value):
 def num_to_cc(i):
     return int((i*midi_max)/(num_pins-1))
 
+def num_to_mid_cc(i):
+    return int((i*midi_max)/(num_pins) + (num_pins)/2)
+
 def get_steps(beep):
     last_val = beep[0]
     ranges = [0]
@@ -30,16 +33,17 @@ pins = range(num_pins)
 cc = range(midi_max+1)
 
 ccs = list(map(lambda x: num_to_cc(x), pins))
+ccs_mid = list(map(lambda x: num_to_mid_cc(x), pins))
 
 back_calc = list(map(lambda x: mid_cc_to_num(x), ccs))
 back_calc_mid = list(map(lambda x: mid_cc_to_num(x), ccs))
 
 
 print(list(pins))
-print(ccs)
+print("         Midi value from input button: " + str(ccs))
+print("Centered Midi value from input button: " + str(ccs_mid))
 print("direct translation: " + str(back_calc))
 print("center translation: " + str(back_calc_mid))
 
 print("direct translation ranges: " + str(get_steps(list(map(lambda x: cc_to_num(x), cc)))))
 print("center translation ranges: " + str(get_steps(list(map(lambda x: mid_cc_to_num(x), cc)))))
-

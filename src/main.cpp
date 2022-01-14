@@ -49,14 +49,15 @@ static constexpr PinOffs num_output_pins = sizeof(OUTPUT_PINS);
 // global variables
 uint8_t input_state[num_input_pins] = {0};      // reducing messages to "only changed"
 Time last_input_change[num_input_pins] = {0};   // input debounce
-uint8_t last_mici_cc_value = 0;
+int8_t last_mici_cc_value = -1;
 
 uint8_t num_to_cc(PinOffs pin_number){
+  static_assert(num_input_pins > 1);
   return (pin_number*midi_max)/(num_input_pins-1);
 }
 PinOffs cc_to_num(uint8_t cc_value){
   return ((num_output_pins-1)*cc_value+((midi_max/(num_input_pins-1))*2))/midi_max;
-  // this reacts at "start" of range, sometimes not good with certain DAWs
+  // The following reacts to "start" of range, sometimes not good with certain DAWs
   //return ((num_output_pins-1)*cc_value+(midi_max-1))/midi_max;
 }
 static_assert(num_input_pins == num_output_pins,
@@ -91,11 +92,10 @@ class myMidi : public USBMIDI {
           offs = note - base_note;
         }
       }
-      if(offs >= 0 && (!midi_cc_has_priority ||
-                        (midi_cc_has_priority &&
-                          (last_mici_cc_value == 0 || // this one uses the fact that Ableton sends back the region's centered cc value, not the original one
-                          (last_mici_cc_value > 0 && offs != cc_to_num(last_mici_cc_value)))
-                      ) ) )
+      if(offs >= 0 && !(midi_cc_has_priority &&
+                          (last_mici_cc_value >= 0 &&               // Default state: -1
+                            offs == cc_to_num(last_mici_cc_value))  // would override cc indicator
+                       ) ) 
       {
         digitalWrite(OUTPUT_PINS[offs], on ^ invert_output);
       }
