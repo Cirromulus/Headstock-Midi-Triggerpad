@@ -92,7 +92,8 @@ class myMidi : public USBMIDI {
           offs = note - base_note;
         }
       }
-      if(offs >= 0 && !(midi_cc_has_priority &&
+      if(offs >= 0 && offs < num_output_pins &&
+      		!(midi_cc_has_priority &&
                           (last_mici_cc_value >= 0 &&               // Default state: -1
                             offs == cc_to_num(last_mici_cc_value))  // would override cc indicator
                        ) ) 
@@ -170,5 +171,12 @@ void loop() {
             input_state[i] = meas;
             last_input_change[i] = now;
         }
+    }
+}
+
+void testloop() {
+	bool a_button_pressed = false;
+    for(uint8_t i = 0; i < num_input_pins; i++) {
+        a_button_pressed |= digitalRead(INPUT_PINS[i]) ^ invert_input;
     }
 }
