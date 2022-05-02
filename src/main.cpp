@@ -92,12 +92,13 @@ class myMidi : public USBMIDI {
           offs = note - base_note;
         }
       }
-      if(offs >= 0 && offs < num_output_pins &&
-      		!(midi_cc_has_priority &&
-                          (last_mici_cc_value >= 0 &&               // Default state: -1
-                            offs == cc_to_num(last_mici_cc_value))  // would override cc indicator
-                       ) ) 
-      {
+      if(offs >= 0 && offs < num_output_pins) {
+        if(midi_cc_has_priority &&
+              (last_mici_cc_value >= 0 &&				// is not in default state (-1)
+               offs == cc_to_num(last_mici_cc_value))	// would override cc indicator
+          ) {
+ 			on = !on;									// invert light
+          }
         digitalWrite(OUTPUT_PINS[offs], on ^ invert_output);
       }
       digitalWrite(PC13, on ^ true); //debug
