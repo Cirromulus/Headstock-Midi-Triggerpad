@@ -65,6 +65,23 @@ static_assert(num_input_pins == num_output_pins,
   "midi CCs are not mapped correctly"
 );
 
+// lights all outputs, stops if no button is pressed after the first run
+void testloop() {
+	while(true) {
+		bool a_button_pressed = false;
+		for(uint8_t i = 0; i < num_input_pins; i++) {
+		    a_button_pressed |= digitalRead(INPUT_PINS[i]) ^ invert_input;
+		}
+		for(uint8_t i = 0; i < num_output_pins; i++) {
+		  	digitalWrite(OUTPUT_PINS[i], true ^ invert_output);
+		  	delay(1000/num_output_pins + 1);
+		  	digitalWrite(OUTPUT_PINS[i], false ^ invert_output);
+		}
+		if(!a_button_pressed)
+			return;
+	}
+}
+
 class myMidi : public USBMIDI {
   void actuateNote(unsigned int channel, unsigned int note, bool on) {
     int8_t offs = -1;
@@ -153,6 +170,8 @@ void setup() {
     midi.registerComponent();
     CompositeSerial.registerComponent();
     USBComposite.begin();
+
+    testloop();
 }
 
 void loop() {
@@ -172,12 +191,5 @@ void loop() {
             input_state[i] = meas;
             last_input_change[i] = now;
         }
-    }
-}
-
-void testloop() {
-	bool a_button_pressed = false;
-    for(uint8_t i = 0; i < num_input_pins; i++) {
-        a_button_pressed |= digitalRead(INPUT_PINS[i]) ^ invert_input;
     }
 }
